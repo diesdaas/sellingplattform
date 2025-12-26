@@ -95,8 +95,17 @@ router.use(uploadRoutes, uploadLimiter);
 router.use('/', createProxyMiddleware({
   target: services.backend.url,
   changeOrigin: true,
-  pathRewrite: {
-    // Keep /api prefix for backend routing
+  pathRewrite: (path, req) => {
+    // Rewrite /api/products to /api/catalog/products
+    if (path.startsWith('/api/products')) {
+      return path.replace('/api/products', '/api/catalog/products');
+    }
+    // Rewrite /api/artworks to /api/catalog/artworks
+    if (path.startsWith('/api/artworks')) {
+      return path.replace('/api/artworks', '/api/catalog/artworks');
+    }
+    // Keep other /api paths as is
+    return path;
   },
   onProxyReq: (proxyReq, req, res) => {
     // Forward JWT token if present

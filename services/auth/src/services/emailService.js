@@ -10,9 +10,17 @@ class EmailService {
   async initialize() {
     if (this.initialized) return;
 
+    // Skip initialization in development if no SMTP config
+    if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST && !process.env.SMTP_USER) {
+      logger.warn('Email service not configured for development - emails will be logged only');
+      this.mockMode = true;
+      this.initialized = true;
+      return;
+    }
+
     try {
       // Create transporter
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: process.env.SMTP_PORT || 587,
         secure: false, // true for 465, false for other ports
@@ -52,6 +60,16 @@ class EmailService {
       await this.initialize();
 
       const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+
+      // Mock mode - just log the email
+      if (this.mockMode) {
+        logger.info('Email verification (mock mode)', {
+          userId: user.id,
+          email: user.email,
+          verificationUrl: verificationUrl
+        });
+        return { success: true, mock: true, message: 'Email verification link logged (mock mode)' };
+      }
 
       const mailOptions = {
         from: `"${process.env.FROM_NAME || 'GoCart'}" <${process.env.FROM_EMAIL || 'noreply@gocart.com'}>`,
