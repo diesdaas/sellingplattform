@@ -101,10 +101,17 @@ start_frontend() {
 
     cd gocart
 
-    # Dependencies installieren falls node_modules nicht existiert
-    if [ ! -d "node_modules" ]; then
+    # Dependencies installieren falls node_modules nicht existiert oder package-lock.json neuer ist
+    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
         log "Installing frontend dependencies..."
         npm install
+        if [ $? -ne 0 ]; then
+            error "Failed to install frontend dependencies"
+            cd ..
+            return 1
+        fi
+    else
+        log "Frontend dependencies already installed"
     fi
 
     # Frontend im Hintergrund starten
@@ -113,14 +120,15 @@ start_frontend() {
 
     # Kurze Pause für Next.js Startup
     log "Waiting for Next.js to start..."
-    sleep 5
+    sleep 8
 
-    # Prüfen ob Frontend läuft
+    # Prüfen ob Frontend noch läuft
     if kill -0 $FRONTEND_PID 2>/dev/null; then
         success "Frontend started successfully (PID: $FRONTEND_PID)"
         success "Frontend should be available at http://localhost:3000"
     else
         error "Frontend failed to start"
+        cd ..
         return 1
     fi
 

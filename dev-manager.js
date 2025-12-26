@@ -106,6 +106,21 @@ class DevManager {
 
         const frontendPath = path.join(__dirname, 'gocart')
 
+        // Check if node_modules exists, if not install dependencies
+        const fs = require('fs')
+        const nodeModulesPath = path.join(frontendPath, 'node_modules')
+
+        if (!fs.existsSync(nodeModulesPath)) {
+            this.log('Installing frontend dependencies...')
+            try {
+                await this.runCommand('npm install', { cwd: frontendPath })
+                this.log('✓ Dependencies installed', 'success')
+            } catch (error) {
+                this.log(`✗ Failed to install dependencies: ${error.message}`, 'error')
+                throw error
+            }
+        }
+
         return new Promise((resolve, reject) => {
             this.frontendProcess = spawn('npm', ['run', 'dev'], {
                 cwd: frontendPath,
@@ -123,7 +138,7 @@ class DevManager {
                 this.log('✓ Frontend started successfully', 'success')
                 this.log('📱 Frontend: http://localhost:3000')
                 resolve()
-            }, 3000)
+            }, 5000)
         })
     }
 
