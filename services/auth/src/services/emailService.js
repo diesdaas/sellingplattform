@@ -10,47 +10,54 @@ class EmailService {
   async initialize() {
     if (this.initialized) return;
 
-    // Skip initialization in development if no SMTP config
-    if (process.env.NODE_ENV === 'development' && !process.env.SMTP_HOST && !process.env.SMTP_USER) {
-      logger.warn('Email service not configured for development - emails will be logged only');
+    // Skip initialization if no SMTP credentials are configured
+    const hasSmtpConfig = process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SMTP_HOST;
+    const hasEtherealConfig = process.env.ETHEREAL_USER && process.env.ETHEREAL_PASS;
+    
+    if (!hasSmtpConfig && !hasEtherealConfig) {
+      logger.warn('Email service not configured - emails will be logged only (mock mode)');
       this.mockMode = true;
       this.initialized = true;
       return;
     }
 
     try {
-      // Create transporter
-      this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587,
-        secure: false, // true for 465, false for other ports
+      // Create transporter with proper configuration
+      const transportConfig = hasEtherealConfig ? {
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: process.env.ETHEREAL_USER,
+          pass: process.env.ETHEREAL_PASS
+        }
+      } : {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT) || 587,
+        secure: parseInt(process.env.SMTP_PORT) === 465,
         auth: {
           user: process.env.SMTP_USER,
           pass: process.env.SMTP_PASS
-        },
-        // For development, you can use ethereal.email
-        ...(process.env.NODE_ENV === 'development' && {
-          host: 'smtp.ethereal.email',
-          port: 587,
-          auth: {
-            user: process.env.ETHEREAL_USER || 'test@example.com',
-            pass: process.env.ETHEREAL_PASS || 'test'
-          }
-        })
-      });
+        }
+      };
+
+      this.transporter = nodemailer.createTransport(transportConfig);
 
       // Verify connection
       await this.transporter.verify();
       this.initialized = true;
 
       logger.info('Email service initialized', {
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587
+        host: transportConfig.host,
+        port: transportConfig.port
       });
 
     } catch (error) {
       logger.error('Failed to initialize email service', { error: error.message });
-      throw error;
+      // Fall back to mock mode instead of throwing
+      logger.warn('Falling back to mock mode for email service');
+      this.mockMode = true;
+      this.initialized = true;
     }
   }
 
