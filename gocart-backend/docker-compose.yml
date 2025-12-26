@@ -40,17 +40,6 @@ services:
       - /app/node_modules
     command: npm run dev
 
-  frontend:
-    build: ../gocart
-    container_name: gocart-frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - api
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: http://api:5000 # For inter-container communication
-      NODE_ENV: production
-
 volumes:
   postgres_data:
 

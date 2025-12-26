@@ -118,11 +118,12 @@ class DevManager {
                 reject(error)
             })
 
-            // Wait for Next.js to start (usually takes a few seconds)
+            // Wait for Next.js to start
             setTimeout(() => {
                 this.log('✓ Frontend started successfully', 'success')
+                this.log('📱 Frontend: http://localhost:3000')
                 resolve()
-            }, 5000)
+            }, 3000)
         })
     }
 

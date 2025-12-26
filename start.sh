@@ -111,18 +111,17 @@ start_frontend() {
     npm run dev &
     FRONTEND_PID=$!
 
-    # Warte bis Frontend bereit ist
-    log "Waiting for frontend to be ready..."
-    for i in {1..20}; do
-        if curl -s http://localhost:3000 >/dev/null 2>&1; then
-            success "Frontend is ready on http://localhost:3000"
-            break
-        fi
-        sleep 3
-    done
+    # Kurze Pause für Next.js Startup
+    log "Waiting for Next.js to start..."
+    sleep 5
 
-    if [ $i -eq 20 ]; then
-        warning "Frontend might still be starting... continuing anyway"
+    # Prüfen ob Frontend läuft
+    if kill -0 $FRONTEND_PID 2>/dev/null; then
+        success "Frontend started successfully (PID: $FRONTEND_PID)"
+        success "Frontend should be available at http://localhost:3000"
+    else
+        error "Frontend failed to start"
+        return 1
     fi
 
     cd ..
