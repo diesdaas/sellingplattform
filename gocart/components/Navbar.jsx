@@ -1,5 +1,5 @@
 'use client'
-import { Search, ShoppingCart, User, LogOut } from "lucide-react";
+import { Search, ShoppingCart, User, LogOut, Store, Palette, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,6 +11,7 @@ const Navbar = () => {
     const dispatch = useDispatch();
 
     const [search, setSearch] = useState('')
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const cartCount = useSelector(state => state.cart.total)
     const { user, isAuthenticated } = useSelector(state => state.auth)
 
@@ -40,8 +41,19 @@ const Navbar = () => {
                     <div className="hidden sm:flex items-center gap-4 lg:gap-8 text-slate-600">
                         <Link href="/">Home</Link>
                         <Link href="/shop">Shop</Link>
-                        <Link href="/">About</Link>
-                        <Link href="/">Contact</Link>
+                        
+                        {/* Sell / Artist Link */}
+                        {isAuthenticated && (user?.role === 'artist' || user?.role === 'admin') ? (
+                            <Link href="/store" className="flex items-center gap-1 text-green-600 font-medium hover:text-green-700">
+                                <Store size={16} />
+                                My Store
+                            </Link>
+                        ) : (
+                            <Link href="/create-store" className="flex items-center gap-1 hover:text-green-600">
+                                <Palette size={16} />
+                                Sell Art
+                            </Link>
+                        )}
 
                         <form onSubmit={handleSearch} className="hidden xl:flex items-center w-xs text-sm gap-2 bg-slate-100 px-4 py-3 rounded-full">
                             <Search size={18} className="text-slate-600" />
@@ -55,18 +67,46 @@ const Navbar = () => {
                         </Link>
 
                         {isAuthenticated ? (
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2 px-4 py-2 bg-slate-100 rounded-full">
+                            <div className="relative group">
+                                <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors">
                                     <User size={18} className="text-indigo-500" />
                                     <span className="text-sm font-medium">{user?.name}</span>
-                                </div>
-                                <button 
-                                    onClick={handleLogout}
-                                    className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                    title="Logout"
-                                >
-                                    <LogOut size={20} />
+                                    <ChevronDown size={14} className="text-slate-400" />
                                 </button>
+                                
+                                {/* Dropdown Menu */}
+                                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                                    <Link href="/orders" className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-sm">
+                                        <ShoppingCart size={16} />
+                                        My Orders
+                                    </Link>
+                                    {(user?.role === 'artist' || user?.role === 'admin') && (
+                                        <>
+                                            <Link href="/store" className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-sm">
+                                                <Store size={16} />
+                                                Store Dashboard
+                                            </Link>
+                                            <Link href="/store/add-product" className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-sm">
+                                                <Palette size={16} />
+                                                Add Product
+                                            </Link>
+                                        </>
+                                    )}
+                                    {user?.role === 'admin' && (
+                                        <Link href="/admin" className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 text-sm text-purple-600">
+                                            <User size={16} />
+                                            Admin Panel
+                                        </Link>
+                                    )}
+                                    <hr className="my-2 border-slate-100" />
+                                    <button 
+                                        onClick={handleLogout}
+                                        className="flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-sm text-red-500 w-full text-left"
+                                    >
+                                        <LogOut size={16} />
+                                        Logout
+                                    </button>
+                                </div>
                             </div>
                         ) : (
                             <button 
@@ -79,10 +119,18 @@ const Navbar = () => {
 
                     </div>
 
-                    {/* Mobile User Button  */}
-                    <div className="sm:hidden">
+                    {/* Mobile Menu */}
+                    <div className="sm:hidden flex items-center gap-3">
+                        {isAuthenticated && (user?.role === 'artist' || user?.role === 'admin') && (
+                            <button 
+                                onClick={() => router.push('/store')} 
+                                className="size-10 bg-green-100 rounded-full flex items-center justify-center"
+                            >
+                                <Store size={20} className="text-green-600" />
+                            </button>
+                        )}
                         {isAuthenticated ? (
-                            <button onClick={() => router.push('/profile')} className="size-10 bg-slate-100 rounded-full flex items-center justify-center">
+                            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="size-10 bg-slate-100 rounded-full flex items-center justify-center">
                                 <User size={20} className="text-indigo-500" />
                             </button>
                         ) : (
@@ -97,6 +145,55 @@ const Navbar = () => {
                 </div>
             </div>
             <hr className="border-gray-300" />
+            
+            {/* Mobile Dropdown Menu */}
+            {mobileMenuOpen && isAuthenticated && (
+                <div className="sm:hidden absolute right-4 top-16 w-56 bg-white rounded-lg shadow-lg border border-slate-200 py-2 z-50">
+                    <div className="px-4 py-2 border-b border-slate-100">
+                        <p className="font-medium text-slate-700">{user?.name}</p>
+                        <p className="text-xs text-slate-400">{user?.email}</p>
+                    </div>
+                    <Link href="/shop" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm">
+                        <ShoppingCart size={16} />
+                        Shop
+                    </Link>
+                    <Link href="/orders" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm">
+                        <ShoppingCart size={16} />
+                        My Orders
+                    </Link>
+                    {(user?.role === 'artist' || user?.role === 'admin') ? (
+                        <>
+                            <Link href="/store" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm text-green-600">
+                                <Store size={16} />
+                                Store Dashboard
+                            </Link>
+                            <Link href="/store/add-product" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm">
+                                <Palette size={16} />
+                                Add Product
+                            </Link>
+                        </>
+                    ) : (
+                        <Link href="/create-store" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm text-green-600">
+                            <Palette size={16} />
+                            Become a Seller
+                        </Link>
+                    )}
+                    {user?.role === 'admin' && (
+                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 hover:bg-slate-50 text-sm text-purple-600">
+                            <User size={16} />
+                            Admin Panel
+                        </Link>
+                    )}
+                    <hr className="my-2 border-slate-100" />
+                    <button 
+                        onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
+                        className="flex items-center gap-2 px-4 py-3 hover:bg-red-50 text-sm text-red-500 w-full text-left"
+                    >
+                        <LogOut size={16} />
+                        Logout
+                    </button>
+                </div>
+            )}
         </nav>
     )
 }
