@@ -3,7 +3,9 @@ version: '3.8'
 services:
   # API Gateway
   gateway:
-    build: ./services/gateway
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
     ports:
       - "8080:8080"
     depends_on:
@@ -19,13 +21,15 @@ services:
       - PAYMENT_SERVICE_URL=http://payment:3003
       - BACKEND_URL=http://backend:5000
     volumes:
-      - ./services/gateway/logs:/app/logs
+      - ./services/gateway/logs:/app/services/gateway/logs
     networks:
       - gocart
 
   # Auth Microservice
   auth:
-    build: ./services/auth
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
     ports:
       - "3002:3002"
     depends_on:
@@ -49,13 +53,15 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
     volumes:
-      - ./services/auth/logs:/app/logs
+      - ./services/auth/logs:/app/services/auth/logs
     networks:
       - gocart
 
   # Payment Microservice
   payment:
-    build: ./services/payment
+    build:
+      context: .
+      dockerfile: services/payment/Dockerfile
     ports:
       - "3003:3003"
     depends_on:
@@ -71,13 +77,15 @@ services:
       - STRIPE_WEBHOOK_SECRET=whsec_placeholder
       - ALLOWED_ORIGINS=http://localhost:8080,https://gocart.com
     volumes:
-      - ./services/payment/logs:/app/logs
+      - ./services/payment/logs:/app/services/payment/logs
     networks:
       - gocart
 
   # Modular Backend (Catalog, Order, Media, Notification Modules)
   backend:
-    build: ./gocart-backend
+    build:
+      context: .
+      dockerfile: ./gocart-backend/Dockerfile
     ports:
       - "5000:5000"
     depends_on:
@@ -92,8 +100,10 @@ services:
       - CORS_ORIGIN=http://localhost:3000,http://localhost:8080
       - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
     volumes:
+      - ./gocart-backend/src:/app/src
+      - ./gocart-backend/config:/app/config
       - ./gocart-backend/logs:/app/logs
-      - /app/node_modules
+      - ./packages/shared:/packages/shared
     networks:
       - gocart
 
