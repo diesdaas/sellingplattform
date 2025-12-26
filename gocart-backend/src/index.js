@@ -153,14 +153,4 @@ const initializeServices = async () => {
 // Initialize services
 initializeServices();
 
-// Start server
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`   Database: ${process.env.DATABASE_URL ? 'Configured' : 'Not configured'}`);
-  console.log(`   JWT Secret: ${process.env.JWT_SECRET ? 'Set' : 'Not set'}`);
-});
-
 export default app;
