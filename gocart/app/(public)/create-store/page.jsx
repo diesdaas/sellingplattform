@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import toast from "react-hot-toast"
 import Loading from "@/components/Loading"
+import { useSelector } from 'react-redux';
+import axios from 'axios';
 
 export default function CreateStore() {
 
@@ -35,9 +37,71 @@ export default function CreateStore() {
 
     const onSubmitHandler = async (e) => {
         e.preventDefault()
-        // Logic to submit the store details
+        setLoading(true)
+        const token = localStorage.getItem('token');
+        if (!token) {
+            toast.error('You must be logged in to create a store.');
+            setLoading(false);
+            return;
+        }
 
+        let logoUrl = storeInfo.image;
 
+        // Upload image if it's a File object
+        if (storeInfo.image instanceof File) {
+            const formData = new FormData();
+            formData.append('image', storeInfo.image);
+            formData.append('folder', 'store_logos');
+
+            try {
+                const uploadResponse = await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/media/upload`, formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (uploadResponse.data.success) {
+                    logoUrl = uploadResponse.data.data.image.url;
+                } else {
+                    throw new Error(uploadResponse.data.message || 'Image upload failed');
+                }
+            } catch (uploadError) {
+                toast.error(uploadError.message || 'Failed to upload store logo');
+                setLoading(false);
+                return;
+            }
+        }
+
+        try {
+            const response = await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/vendors/register`, {
+                storeName: storeInfo.name,
+                username: storeInfo.username,
+                description: storeInfo.description,
+                email: storeInfo.email,
+                contact: storeInfo.contact,
+                address: storeInfo.address,
+                logo: logoUrl,
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.data.success) {
+                setAlreadySubmitted(true);
+                setStatus(response.data.data.vendor.store.status);
+                setMessage(response.data.message || 'Store application submitted successfully!');
+                toast.success(response.data.message || 'Store application submitted successfully!');
+            } else {
+                throw new Error(response.data.message || 'Store submission failed');
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message || 'Something went wrong';
+            toast.error(msg);
+            setMessage(msg);
+        } finally {
+            setLoading(false);
+        }
     }
 
     useEffect(() => {
