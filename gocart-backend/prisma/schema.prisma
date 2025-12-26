@@ -1,0 +1,256 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// User Model - Extended with authentication and artist support
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Hashed password
+  name      String
+  image     String?
+  role      String   @default("customer") // "customer" | "artist" | "admin"
+  isArtist  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  portfolio   Portfolio?
+  store       Store?
+  cart        Cart?
+  ratings     Rating[]
+  addresses   Address[]
+  orders      Order[]   @relation("BuyerRelation")
+}
+
+// Portfolio Model - NEW: For artist portfolios
+model Portfolio {
+  id          String   @id @default(cuid())
+  artistId    String   @unique
+  title       String
+  bio         String?
+  coverImage  String?
+  gallery     Json     @default("[]") // Array of Artwork IDs
+  socialLinks Json     @default("{}") // {instagram: "...", twitter: "...", etc.}
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  artist   User     @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  artworks Artwork[]
+}
+
+// Artwork Model - NEW: Individual artworks in portfolios
+model Artwork {
+  id          String   @id @default(cuid())
+  portfolioId String
+  title       String
+  description String?
+  imageUrl    String
+  medium      String?  // "Digital", "Oil", "Watercolor", "Acrylic", etc.
+  style       String?  // "Abstract", "Realistic", "Minimalist", etc.
+  year        Int?
+  tags        String[]
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  // Relations
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  products  Product[]
+}
+
+// Product Model - Extended with PoD (Prodigi) support
+model Product {
+  id          String   @id @default(cuid())
+  artworkId   String?  // Link to Artwork (optional, can be standalone product)
+  storeId     String
+  name        String
+  description String
+  mrp         Float
+  price       Float
+  images      String[]
+  category    String
+  inStock     Boolean  @default(true)
+  
+  // PoD Fields (Prodigi)
+  podProvider String?  // "prodigi"
+  prodigiSku  String?  // Prodigi Product SKU (e.g., "GLOBAL-CFPM-16X20")
+  variants    Json     @default("[]") // [{type: "poster", size: "A3", sku: "...", price: 29.99}, ...]
+  basePrice   Float?   // Base price for calculation
+  
+  // Rating fields
+  rating      Float?   @default(0) // Average rating (0-5)
+  reviewCount Int      @default(0) // Number of reviews
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  store      Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  artwork    Artwork?    @relation(fields: [artworkId], references: [id], onDelete: SetNull)
+  orderItems OrderItem[]
+  ratings    Rating[]
+  cartItems  CartItem[]
+}
+
+// CartItem Model - Extended with variant support
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  productId String
+  variant   Json     @default("{}") // {type: "poster", size: "A3"}
+  quantity  Int      @default(1)
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+// Cart Model - NEW: Shopping cart
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  totalPrice Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items CartItem[]
+}
+
+enum OrderStatus {
+  ORDER_PLACED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  COD
+  STRIPE
+}
+
+// Order Model - Extended with PoD order tracking
+model Order {
+  id            String        @id @default(cuid())
+  userId        String
+  storeId       String
+  total         Float
+  status        OrderStatus   @default(ORDER_PLACED)
+  addressId     String
+  isPaid        Boolean       @default(false)
+  paymentMethod PaymentMethod
+  paymentIntentId String?     // Stripe PaymentIntent ID
+  podOrderIds   Json          @default("[]") // Prodigi Order IDs
+  trackingInfo  Json          @default("{}") // Tracking information from PoD
+  isCouponUsed  Boolean       @default(false)
+  coupon        Json          @default("{}")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  user       User        @relation("BuyerRelation", fields: [userId], references: [id])
+  store      Store       @relation(fields: [storeId], references: [id])
+  address    Address     @relation(fields: [addressId], references: [id])
+  orderItems OrderItem[]
+}
+
+// OrderItem Model
+model OrderItem {
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  variant   Json     @default("{}") // Variant info at time of order
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@id([orderId, productId])
+}
+
+// Rating Model - Extended with images and helpful count
+model Rating {
+  id        String   @id @default(cuid())
+  rating    Int
+  review    String
+  images    String[] @default([]) // Review images
+  helpful   Int      @default(0)
+  userId    String
+  productId String
+  orderId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, orderId])
+}
+
+// Address Model
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String
+  street    String
+  city      String
+  state     String
+  zip       String
+  country   String
+  phone      String
+  createdAt DateTime @default(now())
+
+  // Relations
+  Order Order[]
+  user  User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Coupon Model
+model Coupon {
+  code        String   @id
+  description String
+  discount    Float
+  forNewUser  Boolean
+  forMember   Boolean  @default(false)
+  isPublic    Boolean
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+}
+
+// Store Model
+model Store {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  name        String
+  description String
+  username    String   @unique
+  address     String
+  status      String   @default("pending")
+  isActive    Boolean  @default(false)
+  logo        String
+  email       String
+  contact     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  Product Product[]
+  Order   Order[]
+  user    User      @relation(fields: [userId], references: [id])
+}
+
