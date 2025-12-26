@@ -124,3 +124,4 @@ class StripeService {
 // Export singleton instance
 module.exports = new StripeService();
 
+

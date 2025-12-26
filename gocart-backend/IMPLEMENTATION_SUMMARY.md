@@ -252,3 +252,4 @@ Das Backend für die Artwork-Selling-Plattform mit Print-on-Demand Integration i
 
 **Status**: ✅ Production-Ready (nach Migration & Environment Setup)
 
+
