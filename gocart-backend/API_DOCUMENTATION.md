@@ -1,24 +1,154 @@
 # API Documentation
 
-## Base URL
-```
-http://localhost:5000/api
-```
+## 🏗️ Architecture Overview
 
-## Authentication
+GoCart uses a **microservices architecture** with the following services:
 
-Die meisten Endpoints benötigen einen JWT Token im Authorization Header:
+| Service | Port | Base URL | Purpose |
+|---------|------|----------|---------|
+| **API Gateway** | 8080 | `http://localhost:8080` | Main entry point, routing, auth |
+| **Auth Service** | 3002 | `http://localhost:8080/auth` | User authentication & profiles |
+| **Payment Service** | 3003 | `http://localhost:8080/payments` | Stripe payments & payouts |
+| **Backend** | 5000 | `http://localhost:8080/api` | Catalog, Orders, Media, Notifications |
+| **Frontend** | 3000 | `http://localhost:3000` | React/Next.js application |
+
+## 🔑 Authentication
+
+All protected endpoints require a JWT token in the Authorization header:
 ```
 Authorization: Bearer <token>
 ```
 
+## 📡 Base URLs
+
+### API Gateway (Recommended)
+```
+http://localhost:8080
+```
+Routes all requests to appropriate microservices automatically.
+
+### Direct Service Access (Development)
+```
+Auth:     http://localhost:3002/auth
+Payment:  http://localhost:3003/payments
+Backend:  http://localhost:5000/api
+```
+
 ---
 
-## Auth Endpoints
+## 🔄 Migration from Monolithic API
+
+### Old URLs → New URLs
+```
+OLD: /api/auth/login          → NEW: /auth/login (via Gateway)
+OLD: /api/products            → NEW: /api/catalog/products (via Gateway)
+OLD: /api/payments/create     → NEW: /payments/create (via Gateway)
+```
+
+### Backward Compatibility
+The API Gateway maintains backward compatibility where possible, but new features use the microservices architecture.
+
+---
+
+## 📦 Catalog API
+
+### List Products
+```http
+GET /api/catalog/products?page=1&limit=20&category=paintings&minPrice=10&maxPrice=100&search=abstract&sortBy=price&order=asc
+```
+
+**Query Parameters:**
+- `page` (number): Page number (default: 1)
+- `limit` (number): Items per page (default: 20, max: 50)
+- `category` (string): Filter by category
+- `minPrice` (number): Minimum price filter
+- `maxPrice` (number): Maximum price filter
+- `search` (string): Search in name and description
+- `artistId` (string): Filter by artist UUID
+- `inStock` (boolean): Filter by stock status
+- `sortBy` (string): Sort field (createdAt, price, name)
+- `order` (string): Sort order (asc, desc)
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Products retrieved successfully",
+  "data": {
+    "products": [
+      {
+        "id": "uuid",
+        "name": "Abstract Painting",
+        "price": 99.99,
+        "category": "paintings",
+        "store": {
+          "id": "uuid",
+          "name": "Artist Store",
+          "username": "artist-store"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 1,
+      "pages": 1
+    }
+  }
+}
+```
+
+### Get Product by ID
+```http
+GET /api/catalog/products/{id}
+```
+
+### Create Product (Artists Only)
+```http
+POST /api/catalog/products
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "name": "Beautiful Painting",
+  "description": "A stunning landscape painting",
+  "price": 149.99,
+  "category": "landscapes",
+  "artworkId": "uuid", // optional
+  "images": ["https://example.com/image.jpg"]
+}
+```
+
+### List Artworks
+```http
+GET /api/catalog/artworks?page=1&limit=20&artistId=uuid&search=landscape&medium=oil&style=impressionist
+```
+
+### Create Artwork (Artists Only)
+```http
+POST /api/catalog/artworks
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Sunset Landscape",
+  "description": "Beautiful sunset over mountains",
+  "imageUrl": "https://example.com/artwork.jpg",
+  "medium": "oil",
+  "style": "impressionist",
+  "year": 2024,
+  "tags": ["landscape", "sunset", "mountains"],
+  "isPublic": true
+}
+```
+
+---
+
+## 🔐 Auth Endpoints
 
 ### Register User
 ```http
-POST /api/auth/register
+POST /auth/register
 Content-Type: application/json
 
 {

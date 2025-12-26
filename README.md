@@ -15,10 +15,11 @@
 
 ## 📖 Überblick
 
-GoCart ist eine moderne, Multi-Vendor E-Commerce-Plattform, die speziell für Künstler entwickelt wurde. Künstler können ihre Artworks hochladen, persönliche Portfolios erstellen und ihre Werke über Print-on-Demand (PoD) als physische Produkte verkaufen.
+GoCart ist eine moderne, **vollständig containerisierte Microservices E-Commerce-Plattform**, die speziell für Künstler entwickelt wurde. Künstler können ihre Artworks hochladen, persönliche Portfolios erstellen und ihre Werke über Print-on-Demand (PoD) als physische Produkte verkaufen.
 
 ### 🎯 Hauptmerkmale
 
+- **🏗️ Microservices Architektur**: Vollständig modulare, skalierbare Services
 - **👨‍🎨 Künstler-Portfolios**: Individuelle Portfolio-Seiten für jeden Künstler
 - **🖨️ Print-on-Demand**: Integration mit Prodigi für hochwertige Kunstdrucke
 - **💳 Stripe-Zahlungen**: Sichere Zahlungsabwicklung mit automatischem Fulfillment
@@ -26,27 +27,59 @@ GoCart ist eine moderne, Multi-Vendor E-Commerce-Plattform, die speziell für K�
 - **🎛️ Admin-Panel**: Vollständige Plattform-Verwaltung für Administratoren
 - **📊 Analytics**: Ausführliche Verkaufs- und Performance-Analytics
 - **⭐ Reviews & Ratings**: Bewertungssystem für Produkte und Künstler
+- **🐳 Docker Ready**: Vollständige Containerisierung für Entwicklung und Produktion
+- **🧪 Integration Tests**: Automatisierte Tests für alle Services
+- **📚 Production Ready**: Deployment-Guides und Monitoring-Setup
 
 ---
 
 ## 🏗️ Architektur
 
-Das Projekt besteht aus zwei Hauptkomponenten:
+GoCart verwendet eine **moderne Microservices-Architektur** mit 8 unabhängigen Services:
 
-### Frontend (`gocart/`)
-- **Framework**: Next.js 14 mit App Router
+### 🎨 Frontend (`gocart/`)
+- **Framework**: Next.js 15 mit App Router & Turbopack
 - **Styling**: Tailwind CSS
 - **State Management**: Redux Toolkit
-- **Icons**: Lucide React
+- **API Clients**: Service-spezifische API-Module
 - **Deployment**: Vercel-ready
 
-### Backend (`gocart-backend/`)
-- **Runtime**: Node.js mit Express.js
-- **Database**: PostgreSQL mit Prisma ORM
-- **Authentication**: JWT mit bcryptjs
-- **Payments**: Stripe Integration
-- **PoD Service**: Prodigi API
-- **Containerisierung**: Docker & Docker Compose
+### 🚀 Microservices Backend
+
+#### **API Gateway** (`services/gateway/`)
+- **Port**: 8080
+- **Funktion**: Zentraler Proxy, Routing, Authentifizierung, Rate Limiting
+- **Technologie**: Express.js mit http-proxy-middleware
+
+#### **Auth Service** (`services/auth/`)
+- **Port**: 3002
+- **Funktion**: User-Management, JWT-Authentifizierung, Sessions
+- **Database**: PostgreSQL (separate DB)
+- **Features**: Registrierung, Login, Email-Verifizierung
+
+#### **Payment Service** (`services/payment/`)
+- **Port**: 3003
+- **Funktion**: Stripe-Integration, Payouts, Webhooks
+- **Database**: PostgreSQL (separate DB)
+- **Features**: Zahlungsabwicklung, Auszahlungen, Transaktionen
+
+#### **Backend Service** (`gocart-backend/`)
+- **Port**: 5000
+- **Funktion**: Katalog, Bestellungen, Medien, Benachrichtigungen
+- **Architektur**: Modular mit 4 unabhängigen Modulen
+- **Database**: PostgreSQL (Haupt-DB)
+
+### 🗄️ Infrastruktur & Datenbanken
+- **PostgreSQL**: 3 separate Datenbanken (Auth, Payment, Main)
+- **Redis**: Session-Management & Caching
+- **RabbitMQ**: Event-Driven Communication
+- **Docker**: Vollständige Containerisierung
+
+### 📦 Shared Libraries (`packages/shared/`)
+- **Error Handling**: Zentralisierte Fehlerbehandlung mit Prisma-Support
+- **Validation**: Joi-Schemas für alle Services
+- **Logging**: Winston-Logger mit strukturiertem Logging
+- **Event Publishing**: RabbitMQ Event-System
 
 ---
 
@@ -71,11 +104,19 @@ cd sellingplattform
 
 #### Linux/Mac:
 ```bash
+# Alle Microservices starten (empfohlen)
+./start-all-services.sh
+
+# Oder nur Frontend + Backend
 ./start.sh
 ```
 
 #### Windows:
 ```cmd
+REM Alle Microservices starten (empfohlen)
+start-all-services.bat
+
+REM Oder nur Frontend + Backend
 start.bat
 ```
 
@@ -120,6 +161,9 @@ npm run dev
 ### 4. Anwendung öffnen
 
 - **Frontend**: http://localhost:3000
+- **API Gateway**: http://localhost:8080 (Haupteinstiegspunkt)
+- **Auth Service**: http://localhost:3002
+- **Payment Service**: http://localhost:3003
 - **Backend API**: http://localhost:5000
 - **Database GUI**: http://localhost:5555 (Prisma Studio)
 
@@ -342,25 +386,74 @@ Bei Fragen oder Problemen:
 
 ## 🏆 Features im Überblick
 
+### 🚀 System-Architektur
+- ✅ **Microservices**: 8 unabhängige, skalierbare Services
+- ✅ **API Gateway**: Zentrales Routing mit Authentifizierung
+- ✅ **Event-Driven**: RabbitMQ für Service-Kommunikation
+- ✅ **Docker Ready**: Vollständige Containerisierung
+- ✅ **Production Ready**: Deployment-Guides & Monitoring
+
 ### Für Kunden
-- ✅ Produkt-Browsing mit Kategorien
-- ✅ Warenkorb & Checkout
+- ✅ Produkt-Browsing mit erweiterten Filtern
+- ✅ Warenkorb & Stripe-Checkout
 - ✅ Künstler-Portfolio-Browsing
 - ✅ Produkt-Reviews & Ratings
 - ✅ Sichere Stripe-Zahlungen
+- ✅ Responsive Mobile-Optimierung
 
 ### Für Künstler
-- ✅ Persönliches Portfolio
-- ✅ Artwork-Upload & Management
+- ✅ Persönliches Portfolio-Management
+- ✅ Artwork-Upload & Kategorisierung
 - ✅ Automatische Produkt-Erstellung aus Artworks
+- ✅ Print-on-Demand Integration (Prodigi)
 - ✅ Verkaufs-Analytics & Reports
-- ✅ Order-Management
+- ✅ Order-Management & Fulfillment
 
 ### Für Administratoren
 - ✅ Vollständiges Admin-Panel
-- ✅ Vendor-Genehmigung
-- ✅ Plattform-Analytics
-- ✅ System-Monitoring
+- ✅ Vendor-Genehmigung & Management
+- ✅ Plattform-Analytics & Insights
+- ✅ System-Monitoring & Health Checks
+- ✅ Email-Benachrichtigungen
+- ✅ Datenbank-Management
+
+### 🛠️ Developer Features
+- ✅ **Integration Tests**: Automatisierte Service-Tests
+- ✅ **Type Safety**: Prisma-generierte Typen
+- ✅ **Error Handling**: Comprehensive Fehlerbehandlung
+- ✅ **Validation**: Joi-Schema-Validierung
+- ✅ **Logging**: Strukturiertes Winston-Logging
+- ✅ **Hot Reload**: Entwicklung mit Auto-Restart
+
+---
+
+## 📊 System Status
+
+### ✅ **Completed Major Improvements**
+- 🏗️ **Microservices Architecture**: 8 independent services
+- 🔧 **Database Schema**: All PostgreSQL DBs initialized
+- 🚀 **Full Controllers**: Complete product & artwork management
+- 🌐 **API Gateway Integration**: Frontend connected to microservices
+- 🔗 **API Clients**: Service-specific frontend clients
+- 🛡️ **Error Handling**: Comprehensive validation & logging
+- 🧪 **Integration Tests**: Automated testing framework
+- 📚 **Documentation**: Updated API docs & deployment guides
+- 🐳 **Docker Setup**: Production-ready containerization
+
+### 🚀 **Service Health**
+| Service | Port | Status | Database |
+|---------|------|--------|----------|
+| **API Gateway** | 8080 | ✅ Running | - |
+| **Auth Service** | 3002 | ✅ Running | PostgreSQL:5433 |
+| **Payment Service** | 3003 | ✅ Running | PostgreSQL:5434 |
+| **Backend** | 5000 | ✅ Running | PostgreSQL:5432 |
+| **Frontend** | 3000 | ✅ Running | - |
+| **Redis** | 6379 | ✅ Running | - |
+| **RabbitMQ** | 5672 | ✅ Running | - |
+
+**Start System**: `./start-all-services.sh`  
+**Run Tests**: `node test-integration.js`  
+**Deploy**: See `DEPLOYMENT.md`
 
 ---
 

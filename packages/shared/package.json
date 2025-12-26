@@ -1,0 +1,23 @@
+{
+  "name": "@gocart/shared",
+  "version": "1.0.0",
+  "description": "Shared utilities and libraries for GoCart microservices",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint src/**/*.js"
+  },
+  "dependencies": {
+    "joi": "^17.9.2",
+    "winston": "^3.8.2",
+    "amqplib": "^0.10.3",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "eslint": "^8.45.0"
+  }
+}

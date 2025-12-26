@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Payment Model - Records all payment transactions
+model Payment {
+  id            String   @id @default(cuid())
+  userId        String   // Customer who made the payment
+  orderId       String   // Related order ID
+  stripePaymentIntentId String @unique // Stripe PaymentIntent ID
+  amount        Int      // Amount in cents
+  currency      String   @default("usd")
+  status        PaymentStatus @default(PENDING)
+  metadata      Json?    // Additional payment data
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  transactions  PaymentTransaction[]
+  refunds       Refund[]
+
+  @@map("payments")
+}
+
+// Payment Transaction Model - Detailed transaction records
+model PaymentTransaction {
+  id            String   @id @default(cuid())
+  paymentId     String
+  stripeChargeId String? // Stripe Charge ID
+  amount        Int      // Amount in cents
+  fee           Int?     // Stripe fee in cents
+  netAmount     Int?     // Net amount after fees
+  currency      String   @default("usd")
+  type          TransactionType
+  status        TransactionStatus @default(PENDING)
+  metadata      Json?    // Stripe response data
+  processedAt   DateTime?
+  createdAt     DateTime @default(now())
+
+  // Relations
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@map("payment_transactions")
+}
+
+// Payout Model - Artist payouts via Stripe Connect
+model Payout {
+  id            String   @id @default(cuid())
+  artistId      String   // Artist receiving the payout
+  stripeAccountId String // Stripe Connect account ID
+  amount        Int      // Amount in cents
+  currency      String   @default("usd")
+  status        PayoutStatus @default(PENDING)
+  stripePayoutId String? @unique // Stripe Payout ID
+  metadata      Json?    // Additional payout data
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+  completedAt   DateTime?
+
+  @@map("payouts")
+}
+
+// Refund Model - Payment refunds
+model Refund {
+  id            String   @id @default(cuid())
+  paymentId     String
+  stripeRefundId String @unique // Stripe Refund ID
+  amount        Int      // Amount in cents
+  currency      String   @default("usd")
+  reason        RefundReason?
+  status        RefundStatus @default(PENDING)
+  metadata      Json?    // Stripe response data
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+
+  // Relations
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@map("refunds")
+}
+
+// Stripe Connect Account Model - Artist Stripe Connect accounts
+model StripeConnectAccount {
+  id            String   @id @default(cuid())
+  artistId      String   @unique
+  stripeAccountId String @unique // Stripe Connect account ID
+  status        ConnectStatus @default(PENDING)
+  capabilities  Json     @default("{}") // Enabled capabilities
+  requirements  Json     @default("{}") // Account requirements
+  metadata      Json?    // Additional account data
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("stripe_connect_accounts")
+}
+
+// Enums
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REQUIRES_PAYMENT_METHOD
+  REQUIRES_CONFIRMATION
+  REQUIRES_ACTION
+}
+
+enum TransactionType {
+  CHARGE
+  REFUND
+  FEE
+  TRANSFER
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum PayoutStatus {
+  PENDING
+  IN_TRANSIT
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum RefundReason {
+  DUPLICATE
+  FRAUDULENT
+  REQUESTED_BY_CUSTOMER
+}
+
+enum ConnectStatus {
+  PENDING
+  RESTRICTED
+  ACTIVE
+  INACTIVE
+}

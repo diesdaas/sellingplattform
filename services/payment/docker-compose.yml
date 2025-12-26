@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  payment:
+    build: .
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://user:pass@postgres-payment:5432/payment
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+      - STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key_here
+      - STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+      - ALLOWED_ORIGINS=http://localhost:8080,https://gocart.com
+    depends_on:
+      - postgres-payment
+      - rabbitmq
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - gocart
+
+  postgres-payment:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=payment
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - gocart
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - gocart
+
+volumes:
+  payment-db-data:
+  rabbitmq-data:
+
+networks:
+  gocart:
+    driver: bridge

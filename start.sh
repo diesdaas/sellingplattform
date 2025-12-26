@@ -1,219 +1,174 @@
 #!/bin/bash
 
-# GoCart Development Environment Launcher
-# Einfacher Start für das gesamte GoCart-System
+# GoCart Development Environment Starter
+# This script starts all microservices for development
 
 set -e
 
 echo "🚀 Starting GoCart Development Environment"
-echo "=========================================="
+echo "========================================="
 
-# Farbcodes für Output
+# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Funktion für farbigen Output
-log() {
-    echo -e "${BLUE}[$(date +'%H:%M:%S')]${NC} $1"
-}
-
-success() {
-    echo -e "${GREEN}[$(date +'%H:%M:%S')] ✓ $1${NC}"
-}
-
-error() {
-    echo -e "${RED}[$(date +'%H:%M:%S')] ✗ $1${NC}"
-}
-
-warning() {
-    echo -e "${YELLOW}[$(date +'%H:%M:%S')] ⚠ $1${NC}"
-}
-
-# Prüfe Voraussetzungen
-check_prerequisites() {
-    log "Checking prerequisites..."
-
-    # Docker prüfen
-    if ! docker info >/dev/null 2>&1; then
-        error "Docker is not running. Please start Docker first."
+# Function to check if Docker is running
+check_docker() {
+    if ! docker info > /dev/null 2>&1; then
+        echo -e "${RED}❌ Docker is not running. Please start Docker and try again.${NC}"
         exit 1
     fi
-    success "Docker is running"
-
-    # Node.js prüfen
-    if ! command -v node >/dev/null 2>&1; then
-        error "Node.js is not installed."
-        exit 1
-    fi
-    success "Node.js is available"
-
-    # npm prüfen
-    if ! command -v npm >/dev/null 2>&1; then
-        error "npm is not installed."
-        exit 1
-    fi
-    success "npm is available"
 }
 
-# Backend starten
-start_backend() {
-    log "Starting GoCart Backend..."
+# Function to check if Node.js is available
+check_nodejs() {
+    if ! command -v node &> /dev/null; then
+        echo -e "${RED}❌ Node.js is not installed. Please install Node.js and try again.${NC}"
+        exit 1
+    fi
+}
 
-    cd gocart-backend
+# Function to check if npm is available
+check_npm() {
+    if ! command -v npm &> /dev/null; then
+        echo -e "${RED}❌ npm is not installed. Please install npm and try again.${NC}"
+        exit 1
+    fi
+}
 
-    # Stelle sicher, dass env.example existiert
-    if [ ! -f ".env" ]; then
-        if [ -f "env.example" ]; then
-            cp env.example .env
-            warning "Created .env from env.example - please configure your environment variables!"
-        else
-            error "Neither .env nor env.example found in gocart-backend/"
-            exit 1
+# Function to install dependencies if node_modules doesn't exist
+install_dependencies() {
+    local service_name=$1
+    local service_path=$2
+
+    if [ ! -d "$service_path/node_modules" ]; then
+        echo -e "${BLUE}📦 Installing dependencies for $service_name...${NC}"
+        cd "$service_path"
+        npm install
+        cd - > /dev/null
+    fi
+}
+
+# Function to start services with docker-compose
+start_services() {
+    echo -e "${BLUE}🐳 Starting Docker services...${NC}"
+
+    # Start infrastructure services first
+    docker-compose up -d postgres-auth postgres-payment postgres-main redis rabbitmq
+
+    echo -e "${YELLOW}⏳ Waiting for databases and message queue to be ready...${NC}"
+    sleep 10
+
+    # Start microservices
+    docker-compose up -d auth payment backend gateway
+
+    echo -e "${YELLOW}⏳ Waiting for services to be ready...${NC}"
+    sleep 15
+
+    # Check service health
+    check_service_health "gateway" "8080"
+    check_service_health "auth" "3001"
+    check_service_health "payment" "3002"
+    check_service_health "backend" "5000"
+}
+
+# Function to check service health
+check_service_health() {
+    local service_name=$1
+    local port=$2
+    local max_attempts=10
+    local attempt=1
+
+    echo -e "${BLUE}🔍 Checking $service_name health...${NC}"
+
+    while [ $attempt -le $max_attempts ]; do
+        if curl -f http://localhost:$port/health > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ $service_name is healthy${NC}"
+            return 0
         fi
-    fi
 
-    # Docker Container starten
-    docker-compose up --build -d
-
-    # Warte bis Backend bereit ist
-    log "Waiting for backend to be ready..."
-    for i in {1..30}; do
-        if curl -s http://localhost:5000/health >/dev/null 2>&1; then
-            success "Backend is ready on http://localhost:5000"
-            break
-        fi
-        sleep 2
+        echo -e "${YELLOW}⏳ Waiting for $service_name (attempt $attempt/$max_attempts)...${NC}"
+        sleep 5
+        ((attempt++))
     done
 
-    if [ $i -eq 30 ]; then
-        warning "Backend might still be starting... continuing anyway"
-    fi
-
-    cd ..
+    echo -e "${RED}❌ $service_name failed to start${NC}"
+    return 1
 }
 
-# Frontend starten
+# Function to start frontend
 start_frontend() {
-    log "Starting GoCart Frontend..."
+    echo -e "${BLUE}⚛️  Starting Frontend...${NC}"
 
-    cd gocart
+    # Install frontend dependencies
+    install_dependencies "Frontend" "./gocart"
 
-    # Dependencies installieren falls node_modules nicht existiert oder package-lock.json neuer ist
-    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ]; then
-        log "Installing frontend dependencies..."
-        npm install
-        if [ $? -ne 0 ]; then
-            error "Failed to install frontend dependencies"
-            cd ..
-            return 1
-        fi
-    else
-        log "Frontend dependencies already installed"
-    fi
+    # Start frontend in background
+    cd ./gocart
+    npm run dev > ../logs/frontend.log 2>&1 &
+    echo $! > ../logs/frontend.pid
+    cd - > /dev/null
 
-    # Frontend im Hintergrund starten
-    npm run dev &
-    FRONTEND_PID=$!
+    echo -e "${YELLOW}⏳ Waiting for frontend to start...${NC}"
+    sleep 10
 
-    # Kurze Pause für Next.js Startup
-    log "Waiting for Next.js to start..."
-    sleep 8
-
-    # Prüfen ob Frontend noch läuft
-    if kill -0 $FRONTEND_PID 2>/dev/null; then
-        success "Frontend started successfully (PID: $FRONTEND_PID)"
-        success "Frontend should be available at http://localhost:3000"
-    else
-        error "Frontend failed to start"
-        cd ..
-        return 1
-    fi
-
-    cd ..
+    check_service_health "frontend" "3000"
 }
 
-# Cleanup Funktion
-cleanup() {
-    echo ""
-    warning "Shutting down GoCart..."
-
-    # Frontend stoppen
-    if [ ! -z "$FRONTEND_PID" ]; then
-        kill $FRONTEND_PID 2>/dev/null || true
-        success "Frontend stopped"
-    fi
-
-    # Backend stoppen
-    cd gocart-backend
-    docker-compose down 2>/dev/null || true
-    success "Backend stopped"
-    cd ..
-
-    success "GoCart development environment stopped"
-    exit 0
-}
-
-# Hauptfunktion
+# Main execution
 main() {
-    # Signal Handler für sauberes Shutdown
-    trap cleanup SIGINT SIGTERM
+    # Create logs directory
+    mkdir -p logs
 
-    # Prüfungen
-    check_prerequisites
+    echo -e "${BLUE}🔍 Checking prerequisites...${NC}"
+    check_docker
+    echo -e "${GREEN}✅ Docker is running${NC}"
 
-    echo ""
+    check_nodejs
+    echo -e "${GREEN}✅ Node.js is available${NC}"
 
-    # Backend starten
-    start_backend
+    check_npm
+    echo -e "${GREEN}✅ npm is available${NC}"
 
-    # Frontend starten
+    # Install shared libraries
+    if [ ! -d "packages/shared/node_modules" ]; then
+        echo -e "${BLUE}📦 Installing shared libraries...${NC}"
+        cd packages/shared
+        npm install
+        cd - > /dev/null
+    fi
+
+    # Install service dependencies
+    install_dependencies "API Gateway" "./services/gateway"
+    install_dependencies "Auth Service" "./services/auth"
+    install_dependencies "Payment Service" "./services/payment"
+    install_dependencies "Backend" "./gocart-backend"
+
+    # Start services
+    start_services
+
+    # Start frontend
     start_frontend
 
     echo ""
-    success "🎉 GoCart Development Environment is running!"
+    echo -e "${GREEN}🎉 All services started successfully!${NC}"
     echo ""
-    echo "📱 Frontend:    http://localhost:3000"
-    echo "🔧 Backend API: http://localhost:5000"
-    echo "🗄️  Database:   http://localhost:5555 (Prisma Studio)"
+    echo "📋 Service URLs:"
+    echo "   Frontend:     http://localhost:3000"
+    echo "   API Gateway:  http://localhost:8080"
+    echo "   Auth Service: http://localhost:3001"
+    echo "   Payment:      http://localhost:3002"
+    echo "   Backend:      http://localhost:5000"
+    echo "   RabbitMQ:     http://localhost:15672 (guest/guest)"
     echo ""
-    warning "Press Ctrl+C to stop all services"
-    echo "=========================================="
-
-    # Warte auf User Input oder Signal
-    wait
+    echo "📁 Logs are available in the ./logs directory"
+    echo "🛑 To stop all services, run: ./stop.sh"
+    echo ""
+    echo -e "${GREEN}🚀 GoCart is ready for development!${NC}"
 }
 
-# Hilfe anzeigen
-show_help() {
-    echo "GoCart Development Launcher"
-    echo ""
-    echo "Usage:"
-    echo "  ./start.sh              Start the entire GoCart stack"
-    echo "  ./start.sh help         Show this help message"
-    echo ""
-    echo "This script will:"
-    echo "  - Check if Docker and Node.js are available"
-    echo "  - Start the backend with Docker Compose"
-    echo "  - Start the frontend with npm run dev"
-    echo "  - Wait for both services to be ready"
-    echo "  - Handle graceful shutdown on Ctrl+C"
-    echo ""
-    echo "Services:"
-    echo "  - Frontend: http://localhost:3000"
-    echo "  - Backend: http://localhost:5000"
-    echo "  - Database GUI: http://localhost:5555"
-}
-
-# Script-Argumente verarbeiten
-case "${1:-}" in
-    help|--help|-h)
-        show_help
-        exit 0
-        ;;
-    *)
-        main
-        ;;
-esac
+# Run main function
+main "$@"

@@ -1,0 +1,188 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth
+      - payment
+      - backend
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - JWT_SECRET=test-jwt-secret
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth:3002
+      - PAYMENT_SERVICE_URL=http://payment:3003
+      - BACKEND_URL=http://backend:5000
+    volumes:
+      - ./services/gateway/logs:/app/logs
+    networks:
+      - gocart
+
+  # Auth Microservice
+  auth:
+    build: ./services/auth
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DATABASE_URL=postgresql://user:pass@postgres-auth:5432/auth
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET=test-jwt-secret
+      - JWT_REFRESH_SECRET=test-refresh-secret
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USER=your-email@gmail.com
+      - SMTP_PASS=your-app-password
+      - FROM_EMAIL=noreply@gocart.com
+      - FROM_NAME=GoCart
+      - FRONTEND_URL=http://localhost:3000
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+    volumes:
+      - ./services/auth/logs:/app/logs
+    networks:
+      - gocart
+
+  # Payment Microservice
+  payment:
+    build: ./services/payment
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres-payment
+      - rabbitmq
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DATABASE_URL=postgresql://user:pass@postgres-payment:5432/payment
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - STRIPE_SECRET_KEY=sk_test_placeholder
+      - STRIPE_PUBLISHABLE_KEY=pk_test_placeholder
+      - STRIPE_WEBHOOK_SECRET=whsec_placeholder
+      - ALLOWED_ORIGINS=http://localhost:8080,https://gocart.com
+    volumes:
+      - ./services/payment/logs:/app/logs
+    networks:
+      - gocart
+
+  # Modular Backend (Catalog, Order, Media, Notification Modules)
+  backend:
+    build: ./gocart-backend
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres-main
+      - rabbitmq
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - DATABASE_URL=postgresql://user:pass@postgres-main:5432/gocart
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET=your-jwt-secret-here
+      - CORS_ORIGIN=http://localhost:3000,http://localhost:8080
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+    volumes:
+      - ./gocart-backend/logs:/app/logs
+      - /app/node_modules
+    networks:
+      - gocart
+
+  # Frontend
+  frontend:
+    build: ./gocart
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE_URL=http://gateway:8080
+      - NEXT_PUBLIC_CURRENCY_SYMBOL=$
+    volumes:
+      - ./gocart:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - gocart
+
+  # Databases
+  postgres-auth:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=auth
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - gocart
+
+  postgres-payment:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=payment
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - gocart
+
+  postgres-main:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=gocart
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - main-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - gocart
+
+  # Infrastructure
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - gocart
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - gocart
+
+volumes:
+  auth-db-data:
+  payment-db-data:
+  main-db-data:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  gocart:
+    driver: bridge

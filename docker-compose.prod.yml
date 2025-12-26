@@ -1,0 +1,174 @@
+version: '3.8'
+
+services:
+  # API Gateway
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile.prod
+    ports:
+      - "8080:8080"
+    depends_on:
+      - auth
+      - payment
+      - backend
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+      - AUTH_SERVICE_URL=http://auth:3002
+      - PAYMENT_SERVICE_URL=http://payment:3003
+      - BACKEND_URL=http://backend:5000
+    networks:
+      - gocart
+
+  # Auth Microservice
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3002:3002"
+    depends_on:
+      - postgres-auth
+      - redis
+      - rabbitmq
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DATABASE_URL=postgresql://user:${DB_PASSWORD}@postgres-auth:5432/auth
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - FROM_EMAIL=${FROM_EMAIL}
+      - FROM_NAME=${FROM_NAME}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    networks:
+      - gocart
+
+  # Payment Microservice
+  payment:
+    build:
+      context: ./services/payment
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3003:3003"
+    depends_on:
+      - postgres-payment
+      - rabbitmq
+    environment:
+      - NODE_ENV=production
+      - PORT=3003
+      - DATABASE_URL=postgresql://user:${DB_PASSWORD}@postgres-payment:5432/payment
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    networks:
+      - gocart
+
+  # Modular Backend
+  backend:
+    build:
+      context: ./gocart-backend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres-main
+      - rabbitmq
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - DATABASE_URL=postgresql://user:${DB_PASSWORD}@postgres-main:5432/gocart
+      - RABBITMQ_URL=amqp://rabbitmq:5672
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    networks:
+      - gocart
+
+  # Frontend
+  frontend:
+    build:
+      context: ./gocart
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=http://gateway:8080
+      - NEXT_PUBLIC_CURRENCY_SYMBOL=$
+    networks:
+      - gocart
+
+  # Databases
+  postgres-auth:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=auth
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    networks:
+      - gocart
+
+  postgres-payment:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=payment
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+    networks:
+      - gocart
+
+  postgres-main:
+    image: postgres:15
+    environment:
+      - POSTGRES_DB=gocart
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - main-db-data:/var/lib/postgresql/data
+    networks:
+      - gocart
+
+  # Infrastructure
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    networks:
+      - gocart
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - gocart
+
+volumes:
+  auth-db-data:
+  payment-db-data:
+  main-db-data:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  gocart:
+    driver: bridge
