@@ -64,13 +64,21 @@ export const register = async (req, res) => {
       // Don't fail registration if email fails
     }
 
-    // Publish user created event
-    await eventPublisher.publish(EventTypes.USER_CREATED, {
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role
-    });
+    // Publish user created event (optional)
+    try {
+      await eventPublisher.publish(EventTypes.USER_CREATED, {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      });
+    } catch (eventError) {
+      logger.warn('Failed to publish user created event', {
+        userId: user.id,
+        error: eventError.message
+      });
+      // Don't fail registration if event publishing fails
+    }
 
     logger.info('User registered successfully', {
       userId: user.id,
