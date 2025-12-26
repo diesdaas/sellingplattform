@@ -1,0 +1,32 @@
+{
+  "name": "sellingplattform",
+  "version": "1.0.0",
+  "description": "GoCart - Multi-Vendor E-Commerce Platform for Artists",
+  "main": "dev-manager.js",
+  "scripts": {
+    "start": "node dev-manager.js start",
+    "stop": "node dev-manager.js stop",
+    "dev": "node dev-manager.js start",
+    "help": "node dev-manager.js help",
+    "frontend": "cd gocart && npm run dev",
+    "backend": "cd gocart-backend && docker-compose up --build",
+    "backend:stop": "cd gocart-backend && docker-compose down"
+  },
+  "keywords": [
+    "ecommerce",
+    "artwork",
+    "print-on-demand",
+    "multi-vendor",
+    "nextjs",
+    "nodejs"
+  ],
+  "author": "diesdaas",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/diesdaas/sellingplattform.git"
+  }
+}

@@ -65,6 +65,34 @@ git clone https://github.com/diesdaas/sellingplattform.git
 cd sellingplattform
 ```
 
+### 2. Schnellstart (Empfohlen)
+
+**Für einfaches Testen:** Verwende das bereitgestellte Start-Script!
+
+#### Linux/Mac:
+```bash
+./start.sh
+```
+
+#### Windows:
+```cmd
+start.bat
+```
+
+#### Oder mit npm:
+```bash
+npm start
+```
+
+**Das Script startet automatisch:**
+- ✅ Backend mit Docker Compose
+- ✅ Frontend mit npm run dev
+- ✅ Überprüft alle Voraussetzungen
+- ✅ Zeigt Status und URLs an
+- ✅ Behandelt sauberes Shutdown (Ctrl+C)
+
+### 3. Manuelle Installation (Alternativ)
+
 ### 2. Backend starten
 
 ```bash
@@ -208,6 +236,77 @@ Stelle sicher, dass alle Environment-Variablen für Production konfiguriert sind
 - `PRODIGI_ENVIRONMENT=live`
 - Sichere JWT-Secrets
 - Production-Database-URL
+
+---
+
+## 🛠️ Development Management
+
+### Einfache Start/Stop Scripts
+
+Für einfaches Testen und Entwicklung sind mehrere Startmöglichkeiten verfügbar:
+
+#### 1. Automatisches Start-Script (Empfohlen)
+```bash
+# Linux/Mac
+./start.sh
+
+# Windows
+start.bat
+
+# Oder mit npm
+npm start
+```
+
+#### 2. Individuelle Services starten
+```bash
+# Nur Backend starten
+npm run backend
+
+# Nur Frontend starten
+npm run frontend
+
+# Services stoppen
+npm run stop
+```
+
+#### 3. Node.js Development Manager
+```bash
+# Start alles
+node dev-manager.js start
+
+# Stop alles
+node dev-manager.js stop
+
+# Hilfe anzeigen
+node dev-manager.js help
+```
+
+### Was die Scripts machen:
+
+- ✅ **Voraussetzungen prüfen** (Docker, Node.js, npm)
+- ✅ **Backend starten** (Docker Compose mit PostgreSQL)
+- ✅ **Frontend starten** (Next.js Development Server)
+- ✅ **Status überwachen** und URLs anzeigen
+- ✅ **Sauberes Shutdown** bei Ctrl+C
+- ✅ **Fehlerbehandlung** und aussagekräftige Meldungen
+
+### Troubleshooting
+
+Falls etwas nicht funktioniert:
+
+```bash
+# Services stoppen
+npm run stop
+
+# Docker Container bereinigen
+cd gocart-backend && docker-compose down -v
+
+# Dependencies neu installieren
+cd ../gocart && rm -rf node_modules && npm install
+
+# Neu starten
+cd .. && npm start
+```
 
 ---
 
