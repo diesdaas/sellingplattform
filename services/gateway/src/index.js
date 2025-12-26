@@ -1,6 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { corsMiddleware } from './middleware/cors.js';
 import { gatewayLogger, bodyLogger, errorLogger } from './middleware/logging.js';
 import authRoutes from './routes/auth.js';

@@ -99,10 +99,11 @@ const initializeServices = async () => {
 const startServer = async () => {
   await initializeServices();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     logger.info(`🚀 Auth service running on port ${PORT}`, {
       environment: process.env.NODE_ENV || 'development',
-      port: PORT
+      port: PORT,
+      host: '0.0.0.0'
     });
 
     console.log('\n📋 Auth Service Configuration:');
