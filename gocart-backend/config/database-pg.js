@@ -1,8 +1,9 @@
-const { Pool } = require('pg');
-const { config } = require('./env');
+import pg from 'pg';
+const { Pool } = pg;
+import { config } from './env.js';
 
 // Create PostgreSQL connection pool
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: config.database.url,
   max: 20,
   idleTimeoutMillis: 30000,
@@ -10,7 +11,7 @@ const pool = new Pool({
 });
 
 // Test database connection
-async function connectDatabase() {
+export async function connectDatabase() {
   try {
     const client = await pool.connect();
     await client.query('SELECT NOW()');
@@ -23,7 +24,7 @@ async function connectDatabase() {
 }
 
 // Query helper function
-async function query(text, params) {
+export async function query(text, params) {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
@@ -39,7 +40,7 @@ async function query(text, params) {
 }
 
 // Get a client from the pool (for transactions)
-async function getClient() {
+export async function getClient() {
   return await pool.connect();
 }
 
@@ -49,15 +50,9 @@ process.on('beforeExit', async () => {
   console.log('👋 Database pool closed');
 });
 
-module.exports = {
+export default {
   pool,
   query,
   getClient,
   connectDatabase,
 };
-
-
-
-
-
-

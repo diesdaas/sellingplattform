@@ -36,13 +36,22 @@ class DevManager {
     async checkPrerequisites() {
         this.log('Checking prerequisites...')
 
-        // Check if Docker is running
-        try {
-            await this.runCommand('docker info')
-            this.log('✓ Docker is running', 'success')
-        } catch (error) {
-            this.log('✗ Docker is not running. Please start Docker first.', 'error')
-            process.exit(1)
+        // Skip Docker check if SKIP_DOCKER is set or if running on Fly.io
+        const isFly = !!process.env.FLY_APP_NAME
+        const skipDocker = process.env.SKIP_DOCKER === 'true' || isFly
+
+        if (skipDocker) {
+            this.log('Skipping Docker check (running on Fly.io or SKIP_DOCKER is set)', 'warning')
+        } else {
+            // Check if Docker is running
+            try {
+                await this.runCommand('docker info')
+                this.log('✓ Docker is running', 'success')
+            } catch (error) {
+                this.log('✗ Docker is not running. Please start Docker first.', 'error')
+                this.log('If you are deploying to a platform like Fly.io, you may need a different deployment strategy.', 'warning')
+                process.exit(1)
+            }
         }
 
         // Check if Node.js is available
@@ -80,6 +89,18 @@ class DevManager {
         this.log('Starting GoCart Backend...')
 
         const backendPath = path.join(__dirname, 'gocart-backend')
+
+        // Check if docker-compose is available
+        try {
+            await this.runCommand('docker-compose --version')
+        } catch (error) {
+            this.log('✗ docker-compose is not available.', 'error')
+            if (process.env.FLY_APP_NAME) {
+                this.log('Note: Fly.io does not support docker-compose inside a machine by default.', 'warning')
+                this.log('You should deploy services individually or use a different orchestration method.', 'warning')
+            }
+            throw new Error('docker-compose not found')
+        }
 
         return new Promise((resolve, reject) => {
             this.backendProcess = spawn('docker-compose', ['up', '--build'], {

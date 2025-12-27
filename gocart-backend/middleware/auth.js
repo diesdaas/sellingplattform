@@ -1,17 +1,29 @@
-const { verifyToken } = require('../utils/jwt');
-const { query } = require('../config/database');
-const AppError = require('../utils/AppError');
+import { verifyToken } from '../utils/jwt.js';
+import { query } from '../config/database-pg.js';
+import AppError from '../utils/AppError.js';
 
 /**
  * Authentication Middleware
  * Verifies JWT token and attaches user to request
  */
-async function authenticate(req, res, next) {
+export default async function authenticate(req, res, next) {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // Also check X-User-ID header if coming from Gateway
+      const gatewayUserId = req.headers['x-user-id'];
+      if (gatewayUserId) {
+        const userResult = await query(
+          'SELECT id, email, name, image, role, "isArtist", "createdAt" FROM "User" WHERE id = $1',
+          [gatewayUserId]
+        );
+        if (userResult.rows.length > 0) {
+          req.user = userResult.rows[0];
+          return next();
+        }
+      }
       throw new AppError('Authentication required', 401);
     }
 
@@ -47,5 +59,3 @@ async function authenticate(req, res, next) {
     });
   }
 }
-
-module.exports = authenticate;

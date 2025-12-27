@@ -108,6 +108,14 @@ router.use('/', createProxyMiddleware({
     return path;
   },
   onProxyReq: (proxyReq, req, res) => {
+    // Fix body if it was parsed by express.json()
+    if (req.body && Object.keys(req.body).length > 0 && !req.headers['content-type']?.includes('multipart/form-data')) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type', 'application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
+    }
+
     // Forward JWT token if present
     if (req.token) {
       proxyReq.setHeader('authorization', `Bearer ${req.token}`);

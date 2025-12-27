@@ -1,6 +1,7 @@
 import amqp from 'amqplib';
 import { Queues, EXCHANGE_NAME } from '@gocart/shared';
 import { logger } from '@gocart/shared';
+import { query } from '../../../config/database-pg.js';
 
 class EventSubscriber {
   constructor() {
@@ -63,7 +64,11 @@ class EventSubscriber {
       });
 
       // Bind queue to exchange
-      await this.channel.bindQueue(queue.queue, EXCHANGE_NAME, '#'); // Receive all events
+      // For backend, we want to listen to user events, catalog events, etc.
+      await this.channel.bindQueue(queue.queue, EXCHANGE_NAME, 'user.*');
+      await this.channel.bindQueue(queue.queue, EXCHANGE_NAME, 'catalog.*');
+      await this.channel.bindQueue(queue.queue, EXCHANGE_NAME, 'order.*');
+      await this.channel.bindQueue(queue.queue, EXCHANGE_NAME, 'payment.*');
 
       // Set prefetch
       await this.channel.prefetch(prefetch);
@@ -103,7 +108,6 @@ class EventSubscriber {
       });
 
       return consumerTag.consumerTag;
-
     } catch (error) {
       logger.error(`Failed to subscribe to queue: ${queueName}`, {
         error: error.message
@@ -112,96 +116,88 @@ class EventSubscriber {
     }
   }
 
-  // Unsubscribe from a queue
-  async unsubscribe(queueName) {
-    try {
-      const consumerTag = this.consumers.get(queueName);
-      if (consumerTag && this.channel) {
-        await this.channel.cancel(consumerTag);
-        this.consumers.delete(queueName);
-        logger.info(`Unsubscribed from queue: ${queueName}`);
-      }
-    } catch (error) {
-      logger.error(`Failed to unsubscribe from queue: ${queueName}`, {
-        error: error.message
-      });
-    }
-  }
-
-  // Subscribe to notifications queue
-  async subscribeToNotifications() {
-    await this.subscribe(Queues.NOTIFICATIONS, this.handleNotificationEvent.bind(this));
-  }
-
-  // Subscribe to analytics queue
-  async subscribeToAnalytics() {
-    await this.subscribe(Queues.ANALYTICS, this.handleAnalyticsEvent.bind(this));
-  }
-
-  // Subscribe to order processing queue
-  async subscribeToOrderProcessing() {
-    await this.subscribe(Queues.ORDER_PROCESSING, this.handleOrderProcessingEvent.bind(this));
-  }
-
   // Event handlers
-  async handleNotificationEvent(eventData, msg) {
+  async handleEvent(eventData, msg) {
     const { eventType, data, timestamp } = eventData;
 
-    logger.info(`Processing notification event: ${eventType}`, { data, timestamp });
+    logger.info(`Processing event: ${eventType}`, { userId: data.userId });
 
-    // TODO: Implement notification logic based on event type
     switch (eventType) {
       case 'user.created':
-        // Send welcome email
+        await this.syncUser(data);
         break;
-      case 'order.placed':
-        // Send order confirmation
-        break;
-      case 'payment.succeeded':
-        // Send payment confirmation
+      case 'user.updated':
+        await this.updateUser(data);
         break;
       default:
-        logger.debug(`Unhandled notification event: ${eventType}`);
+        logger.debug(`Unhandled event type: ${eventType}`);
     }
   }
 
-  async handleAnalyticsEvent(eventData, msg) {
-    const { eventType, data, timestamp } = eventData;
-
-    logger.info(`Processing analytics event: ${eventType}`, { data, timestamp });
-
-    // TODO: Implement analytics logic
-    // This could write to analytics database, update metrics, etc.
+  async syncUser(data) {
+    try {
+      const { userId, email, name, role } = data;
+      
+      // Check if user already exists in backend DB
+      const existing = await query('SELECT id FROM "User" WHERE id = $1', [userId]);
+      
+      if (existing.rows.length === 0) {
+        await query(
+          'INSERT INTO "User" (id, email, name, role, "isArtist", "password", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, NOW())',
+          [userId, email, name, role, role === 'artist', 'external-auth',]
+        );
+        logger.info('User synced to backend database', { userId, email });
+      }
+    } catch (error) {
+      logger.error('Failed to sync user to backend', { error: error.message, userId: data.userId });
+    }
   }
 
-  async handleOrderProcessingEvent(eventData, msg) {
-    const { eventType, data, timestamp } = eventData;
+  async updateUser(data) {
+    try {
+      const { userId, changes } = data;
+      const fields = [];
+      const params = [userId];
+      let idx = 2;
 
-    logger.info(`Processing order event: ${eventType}`, { data, timestamp });
+      if (changes.name) {
+        fields.push(`name = $${idx}`);
+        params.push(changes.name);
+        idx++;
+      }
+      if (changes.email) {
+        fields.push(`email = $${idx}`);
+        params.push(changes.email);
+        idx++;
+      }
+      if (changes.role) {
+        fields.push(`role = $${idx}`);
+        params.push(changes.role);
+        idx++;
+        fields.push(`"isArtist" = $${idx}`);
+        params.push(changes.role === 'artist');
+        idx++;
+      }
 
-    // TODO: Implement order processing logic
-    switch (eventType) {
-      case 'order.placed':
-        // Process order, update inventory, trigger fulfillment
-        break;
-      case 'payment.succeeded':
-        // Mark order as paid, trigger shipping
-        break;
-      default:
-        logger.debug(`Unhandled order processing event: ${eventType}`);
+      if (fields.length > 0) {
+        await query(
+          `UPDATE "User" SET ${fields.join(', ')}, "updatedAt" = NOW() WHERE id = $1`,
+          params
+        );
+        logger.info('User updated in backend database', { userId });
+      }
+    } catch (error) {
+      logger.error('Failed to update user in backend', { error: error.message, userId: data.userId });
     }
   }
 
   // Initialize all subscriptions
   async initializeSubscriptions() {
     try {
-      await Promise.all([
-        this.subscribeToNotifications(),
-        this.subscribeToAnalytics(),
-        this.subscribeToOrderProcessing()
-      ]);
-
-      logger.info('All event subscriptions initialized');
+      // Use a dedicated queue for the backend service
+      const backendQueue = 'backend.events';
+      await this.subscribe(backendQueue, this.handleEvent.bind(this));
+      logger.info('Backend event subscriptions initialized');
     } catch (error) {
       logger.error('Failed to initialize event subscriptions', { error: error.message });
     }
@@ -209,39 +205,15 @@ class EventSubscriber {
 
   async close() {
     try {
-      // Cancel all consumers
-      for (const [queueName, consumerTag] of this.consumers) {
-        try {
-          await this.unsubscribe(queueName);
-        } catch (error) {
-          logger.error(`Error unsubscribing from ${queueName}`, { error: error.message });
-        }
-      }
-
-      if (this.channel) {
-        await this.channel.close();
-      }
-      if (this.connection) {
-        await this.connection.close();
-      }
+      if (this.channel) await this.channel.close();
+      if (this.connection) await this.connection.close();
       this.connected = false;
       logger.info('Event subscriber disconnected from RabbitMQ');
     } catch (error) {
-      logger.error('Error closing event subscriber connection', { error: error.message });
+      logger.error('Error closing event subscriber', { error: error.message });
     }
   }
 }
 
-// Singleton instance
 const eventSubscriber = new EventSubscriber();
-
 export default eventSubscriber;
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  await eventSubscriber.close();
-});
-
-process.on('SIGTERM', async () => {
-  await eventSubscriber.close();
-});

@@ -62,6 +62,8 @@ import { catalogModule } from './modules/catalog/index.js';
 import { orderModule } from './modules/order/index.js';
 import { mediaModule } from './modules/media/index.js';
 import { notificationModule } from './modules/notification/index.js';
+import { vendorModule } from './modules/vendor/index.js';
+import eventSubscriber from './shared/events/subscriber.js';
 
 // Load environment variables
 dotenv.config();
@@ -109,7 +111,7 @@ app.get('/health', (req, res) => {
 });
 
 // Register modules
-const modules = [catalogModule, orderModule, mediaModule, notificationModule];
+const modules = [catalogModule, orderModule, mediaModule, notificationModule, vendorModule];
 
 modules.forEach(module => {
   if (Array.isArray(module.routes)) {
@@ -143,6 +145,10 @@ const initializeServices = async () => {
 
     // Initialize notification queue consumer (mock for now)
     logger.info('Notification services initialized (mock)');
+
+    // Initialize event subscriber to listen for user creation etc.
+    await eventSubscriber.initializeSubscriptions();
+    logger.info('Event subscriber initialized');
 
   } catch (error) {
     logger.error('Service initialization failed', { error: error.message });
